@@ -5,7 +5,7 @@
  * Author:      Moritz Stueckler
  * Description: Include and parse markdown files from external web sources like GitHub, GitLab, etc.
  * Plugin URI:  https://github.com/pReya/wordpress-external-markdown
- * Version:     0.0.1
+ * Version:     0.1.0
  * License:     GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
@@ -22,7 +22,8 @@ function external_markdown_shortcode($atts = array())
     'class' => 'external-markdown',
     'ttl' => $DEFAULT_CACHE_TTL,
     'copy' => 'true',
-    'cdn' => 'true'
+    'cdn' => 'true',
+    'excerpt' => ''
   ), $atts));
 
   $copy_enabled = !in_array(strtolower(strval($copy)), array('false', '0', 'no'), true);
@@ -31,7 +32,7 @@ function external_markdown_shortcode($atts = array())
 
   // TTL != 0 means caching is enabled
   if ($ttl !== strval(0)) {
-    $cache_key = "external_markdown_" . md5($resolved_url . $class . $ttl . strval($copy) . strval($cdn));
+    $cache_key = "external_markdown_" . md5($resolved_url . $class . $ttl . strval($copy) . strval($cdn) . strval($excerpt));
     $cached = get_transient($cache_key);
   }
 
@@ -62,7 +63,7 @@ function external_markdown_shortcode($atts = array())
       return "<strong>Plugin Error:</strong> Could not fetch converted markdown file.";
     }
 
-    $html_string = external_markdown_build_html($github_response_body, $content_response_body, $class, $copy_enabled);
+    $html_string = external_markdown_build_html($github_response_body, $content_response_body, $class, $copy_enabled, $excerpt);
 
     if ($ttl != 0) {
       set_transient($cache_key, $html_string, $ttl);
@@ -77,26 +78,47 @@ function external_markdown_shortcode($atts = array())
 
 add_shortcode('external_markdown', 'external_markdown_shortcode');
 
-function external_markdown_build_html($rendered_html, $raw_markdown, $class, $copy_enabled)
+function external_markdown_build_html($rendered_html, $raw_markdown, $class, $copy_enabled, $excerpt = '')
 {
   static $style_added = false;
   $wrapper_open = '<div class="external-markdown-wrapper" data-external-markdown="true">';
   $wrapper_close = '</div>';
-  $content_html = '<div class="' . esc_attr($class) . '">' . $rendered_html . '</div>';
+
+  $excerpt_attr = ($excerpt !== '' && intval($excerpt) > 0) ? ' data-excerpt-lines="' . intval($excerpt) . '"' : '';
+  $content_html = '<div class="' . esc_attr($class) . '"' . $excerpt_attr . '>' . $rendered_html . '</div>';
   $style_html = '';
 
   if (!$style_added) {
-    $style_html = '<style>.external-markdown-copy-button{font:inherit;padding:0.5rem 0.85rem;border:1px solid currentColor;border-radius:4px;background:transparent;color:inherit;cursor:pointer;transition:background-color 120ms ease-in-out,transform 120ms ease-in-out;}.external-markdown-copy-button:hover{background-color:rgba(0,0,0,0.06);} .external-markdown-copy-button:active{transform:translateY(1px);} .external-markdown-copy-button:focus-visible{outline:2px solid currentColor;outline-offset:2px;}</style>';
+    $style_html = '<style>'
+      . '.external-markdown-copy-button{font:inherit;padding:0.5rem 0.85rem;border:1px solid currentColor;border-radius:4px;background:transparent;color:inherit;cursor:pointer;transition:background-color 120ms ease-in-out,transform 120ms ease-in-out;}'
+      . '.external-markdown-copy-button:hover{background-color:rgba(0,0,0,0.06);}'
+      . '.external-markdown-copy-button:active{transform:translateY(1px);}'
+      . '.external-markdown-copy-button:focus-visible{outline:2px solid currentColor;outline-offset:2px;}'
+      . '.external-markdown-excerpt-fade{position:absolute;bottom:0;left:0;right:0;height:5em;background:linear-gradient(to bottom,transparent,rgba(255,255,255,0.97));pointer-events:none;}'
+      . '.external-markdown-see-more-button{display:block;margin:0.75rem auto 0;font:inherit;padding:0.5rem 1.25rem;border:1px solid currentColor;border-radius:4px;background:transparent;color:inherit;cursor:pointer;transition:background-color 120ms ease-in-out;}'
+      . '.external-markdown-see-more-button:hover{background-color:rgba(0,0,0,0.06);}'
+      . '.external-markdown-see-more-button:focus-visible{outline:2px solid currentColor;outline-offset:2px;}'
+      . '</style>';
     $style_added = true;
   }
 
+  // Script handles both copy and excerpt; each feature guards its own one-time init.
+  $script_html = '<script>(function(){'
+    . 'if(!window.ExternalMarkdownCopyInit){window.ExternalMarkdownCopyInit=true;'
+    . 'function fallbackCopyText(text){var temp=document.createElement("textarea");temp.value=text;temp.setAttribute("readonly","");temp.style.position="absolute";temp.style.left="-9999px";document.body.appendChild(temp);temp.select();try{document.execCommand("copy");}catch(err){}document.body.removeChild(temp);}'
+    . 'function copyText(text){if(!text){return;}if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).catch(function(){fallbackCopyText(text);});}else{fallbackCopyText(text);}}'
+    . 'document.addEventListener("click",function(event){var button=event.target.closest(".external-markdown-copy-button");if(!button){return;}var wrapper=button.closest("[data-external-markdown]");if(!wrapper){return;}var source=wrapper.querySelector(".external-markdown-source");var text=source?source.value||source.textContent:"";copyText(text);});}'
+    . 'if(!window.ExternalMarkdownExcerptInit){window.ExternalMarkdownExcerptInit=true;'
+    . 'function initExcerpt(){document.querySelectorAll("[data-excerpt-lines]").forEach(function(el){var lines=parseInt(el.getAttribute("data-excerpt-lines"),10);if(!lines||lines<=0){return;}var st=window.getComputedStyle(el);var lh=parseFloat(st.lineHeight);if(isNaN(lh)){lh=parseFloat(st.fontSize)*1.5;}var threshold=lines*lh;if(el.scrollHeight<=threshold){return;}el.style.position="relative";el.style.maxHeight=threshold+"px";el.style.overflow="hidden";var fade=document.createElement("div");fade.className="external-markdown-excerpt-fade";el.appendChild(fade);var btn=document.createElement("button");btn.type="button";btn.className="external-markdown-see-more-button";btn.textContent="See More";el.parentNode.insertBefore(btn,el.nextSibling);btn.addEventListener("click",function(){el.style.maxHeight="";el.style.overflow="";el.style.position="";fade.remove();btn.remove();});});}'
+    . 'if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",initExcerpt);}else{initExcerpt();}}'
+    . '})();</script>';
+
   if (!$copy_enabled) {
-    return $wrapper_open . $style_html . $content_html . $wrapper_close;
+    return $wrapper_open . $style_html . $content_html . $script_html . $wrapper_close;
   }
 
   $button_html = '<button type="button" class="external-markdown-copy-button">Copy to Clipboard</button>';
   $source_html = '<textarea class="external-markdown-source" readonly tabindex="-1" aria-hidden="true" style="position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden;">' . esc_textarea($raw_markdown) . '</textarea>';
-  $script_html = '<script>(function(){if(window.ExternalMarkdownCopyInit){return;}window.ExternalMarkdownCopyInit=true;function fallbackCopyText(text){var temp=document.createElement("textarea");temp.value=text;temp.setAttribute("readonly","");temp.style.position="absolute";temp.style.left="-9999px";document.body.appendChild(temp);temp.select();try{document.execCommand("copy");}catch(err){}document.body.removeChild(temp);}function copyText(text){if(!text){return;}if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).catch(function(){fallbackCopyText(text);});}else{fallbackCopyText(text);}}document.addEventListener("click",function(event){var button=event.target.closest(".external-markdown-copy-button");if(!button){return;}var wrapper=button.closest("[data-external-markdown]");if(!wrapper){return;}var source=wrapper.querySelector(".external-markdown-source");var text=source?source.value||source.textContent:"";copyText(text);});})();</script>';
 
   return $wrapper_open . $style_html . $button_html . $source_html . $content_html . $script_html . $wrapper_close;
 }

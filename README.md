@@ -56,15 +56,29 @@ The `copy` parameter controls whether the "Copy to Clipboard" button is shown. T
 [external_markdown copy="false" url="https://raw.githubusercontent.com/pReya/wordpress-external-markdown/main/README.md"]
 ```
 
-#### Styling the copy button
-The copy button uses the `.external-markdown-copy-button` class. You can override it in your theme's CSS:
+#### Collapsible excerpt with "See More" button
+The `excerpt` parameter limits the visible content to an approximate number of rendered lines. A gradient fade and a "See More" button are injected automatically below the truncated content. Clicking "See More" fully expands the block and removes both the button and the fade. The feature is **disabled by default** — only active when `excerpt` is set.
+```
+[external_markdown excerpt="300" url="https://raw.githubusercontent.com/pReya/wordpress-external-markdown/main/README.md"]
+```
+
+> **Note:** The line count is a visual approximation based on the container's computed `line-height`, not a count of raw Markdown lines. The result will vary slightly depending on your theme's typography.
+
+#### Styling the copy button and excerpt elements
+The copy button uses `.external-markdown-copy-button` and the "See More" button uses `.external-markdown-see-more-button`. The excerpt fade overlay uses `.external-markdown-excerpt-fade`. Override any of these in your theme's CSS:
 ```css
-.external-markdown-copy-button {
+.external-markdown-copy-button,
+.external-markdown-see-more-button {
   font: inherit;
-  padding: 0.5rem 0.85rem;
+  padding: 0.5rem 1.25rem;
   border: 1px solid currentColor;
   border-radius: 4px;
   background: transparent;
+}
+
+/* For dark-background themes, update the fade gradient end colour */
+.external-markdown-excerpt-fade {
+  background: linear-gradient(to bottom, transparent, #1e1e1e);
 }
 ```
 
