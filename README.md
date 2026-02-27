@@ -68,6 +68,85 @@ The copy button uses the `.external-markdown-copy-button` class. You can overrid
 }
 ```
 
+#### Adding a copy button outside the content area (e.g. a navigation bar)
+
+The built-in copy button lives **inside** the plugin's wrapper element (`<div data-external-markdown="true">`). The plugin's JavaScript finds the raw Markdown source by traversing *up* to that wrapper, so a button placed elsewhere on the page (such as a sticky nav bar) won't work with the default wiring.
+
+To place a copy button anywhere on the page you need two things:
+
+**1. Give the shortcode block a unique ID via its `class` parameter**
+
+Use a unique value for `class` so you can target the right block when multiple embeds are on the same page:
+```
+[external_markdown class="my-recipe" url="https://raw.githubusercontent.com/..."]
+```
+This renders as:
+```html
+<div data-external-markdown="true">
+  <textarea class="external-markdown-source">…raw markdown…</textarea>
+  <div class="my-recipe">…rendered HTML…</div>
+</div>
+```
+
+**2. Add a button in your theme's nav (or anywhere) with a `data-target` attribute**
+
+Point `data-target` at the same class name you used in the shortcode:
+```html
+<button type="button"
+        class="external-markdown-copy-button-remote"
+        data-target="my-recipe">
+  Copy Recipe
+</button>
+```
+
+**3. Add custom JavaScript to wire the button up**
+
+Place the following snippet in your theme's `functions.php` (using `wp_add_inline_script` or `wp_footer`), or paste it into the **Appearance → Customize → Additional CSS/JS** panel if your theme supports it:
+
+```js
+document.addEventListener('click', function (event) {
+  var button = event.target.closest('.external-markdown-copy-button-remote');
+  if (!button) return;
+
+  var targetClass = button.dataset.target;
+  if (!targetClass) return;
+
+  // Find the wrapper that contains a block with the target class
+  var block = document.querySelector('.' + targetClass);
+  if (!block) return;
+
+  var wrapper = block.closest('[data-external-markdown]');
+  if (!wrapper) return;
+
+  var source = wrapper.querySelector('.external-markdown-source');
+  var text = source ? (source.value || source.textContent) : '';
+  if (!text) return;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(function () {
+      fallback(text);
+    });
+  } else {
+    fallback(text);
+  }
+
+  function fallback(text) {
+    var temp = document.createElement('textarea');
+    temp.value = text;
+    temp.style.position = 'absolute';
+    temp.style.left = '-9999px';
+    document.body.appendChild(temp);
+    temp.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(temp);
+  }
+});
+```
+
+**How it works:** instead of walking *up* to the wrapper from the button (which fails when the button is outside the wrapper), this script walks *down* — it finds the content `div` by its class name, then calls `.closest('[data-external-markdown]')` on that to reach the wrapper, and finally reads the hidden `<textarea class="external-markdown-source">` that holds the raw Markdown.
+
+> **Note:** If you have multiple embeds on the same page, make sure each shortcode uses a **unique** `class` value, and that each remote button's `data-target` matches the corresponding class.
+
 #### Attention when using GitHub, GitLab, etc.
 When embedding content from Git hosting services like GitHub or GitLab, you normally need the "raw" Markdown URL. For GitHub, this plugin also accepts standard `blob` URLs and will convert them to the jsDelivr CDN automatically when `cdn="true"` (the default). You can find the raw URL in the upper right corner of the GitHub web view.
 
