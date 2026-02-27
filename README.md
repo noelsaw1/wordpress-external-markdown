@@ -12,6 +12,8 @@ This is a plugin for WordPress to embed Markdown files from external web sources
 * Customise the CSS class of the markdown container to adjust styles
 * **"Copy to Clipboard" button** to copy the raw Markdown content (enabled by default)
 * **Automatic GitHub CDN conversion** — GitHub `blob` and `raw.githubusercontent.com` URLs are transparently rewritten to jsDelivr for faster, rate-limit-free delivery
+* **Frontmatter table** — YAML frontmatter between `---` delimiters is parsed and displayed as a styled HTML table above the content (enabled by default)
+* **"Grab Newest" button** — clears the cached version and reloads fresh content from the source with one click (enabled by default when caching is active)
 
 ### Instructions / Examples
 Download and unpack or clone this repository into your `wp-content/plugins` folder, so the PHP file resides in `wp-content/plugins/external-markdown/external-markdown.php`.
@@ -64,8 +66,20 @@ The `excerpt` parameter limits the visible content to an approximate number of r
 
 > **Note:** The line count is a visual approximation based on the container's computed `line-height`, not a count of raw Markdown lines. The result will vary slightly depending on your theme's typography.
 
+#### Disable the frontmatter table
+The `table` parameter controls whether YAML frontmatter (the `---` delimited block at the top of a markdown file) is rendered as an HTML table. The default is `true`. When disabled, the frontmatter is still stripped from the rendered content.
+```
+[external_markdown table="false" url="https://raw.githubusercontent.com/pReya/wordpress-external-markdown/main/README.md"]
+```
+
+#### Disable the "Grab Newest" refresh button
+The `refresh` parameter controls whether the "Grab Newest" button appears in the top-right corner. It clears the cached version and reloads fresh content. The default is `true`; the button is automatically hidden when caching is disabled (`ttl=0`).
+```
+[external_markdown refresh="false" url="https://raw.githubusercontent.com/pReya/wordpress-external-markdown/main/README.md"]
+```
+
 #### Styling the copy button and excerpt elements
-The copy button uses `.external-markdown-copy-button` and the "See More" button uses `.external-markdown-see-more-button`. The excerpt fade overlay uses `.external-markdown-excerpt-fade`. Override any of these in your theme's CSS:
+The copy button uses `.external-markdown-copy-button` and the "See More" button uses `.external-markdown-see-more-button`. The excerpt fade overlay uses `.external-markdown-excerpt-fade`. The frontmatter table uses `.external-markdown-frontmatter`. The refresh button uses `.external-markdown-refresh-button`. Override any of these in your theme's CSS:
 ```css
 .external-markdown-copy-button,
 .external-markdown-see-more-button {
